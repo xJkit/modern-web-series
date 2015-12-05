@@ -10,9 +10,10 @@ class App extends Component {
   render() {
     return (
       <div>
-        <MessageList messages={this.props.messages}/>
+        <MessageList userId={this.props.userId} messages={this.props.messages}/>
         <MessageEntryBox
           value={this.props.currentMessage}
+          userId={this.props.userId}
           onChange={this.props.updateMessage}
           onSubmit={this.props.addMessage}/>
       </div>
@@ -22,6 +23,7 @@ class App extends Component {
 
 function mapStateToProps(state) {
   return {
+    userId: state.userId,
     messages: state.messages,
     currentMessage: state.currentMessage
   };
