@@ -1,27 +1,44 @@
 import io from 'socket.io';
+import r from 'rethinkdb';
 
 export default function (server) {
-  const socketServer = io(server);
-  const connections = [];
-  var userId = 0;
+  r.connect({}).then(dbConnection => {
+    const socketServer = io(server);
+    const connections = {};
+    var userIdCount = 0;
 
-  socketServer.on('connection', socket => {
-    connections.push(socket);
-    userId += 1;
+    r.table('chat_messages')
+      .changes()
+      .run(dbConnection)
+      .then(cursor => {
+        cursor.each((err, row) => {
+          if (!err) {
+            Object.keys(connections).forEach(userId => {
+              const message = row.new_val;
 
-    socket.emit('start', {userId});
-
-    socket.on('message', data => {
-      connections.forEach(connectedSocket => {
-        if (connectedSocket !== socket) {
-          connectedSocket.emit('message', data);
-        }
+              if (+userId !== message.userId) {
+                connections[userId].emit('message', message);
+              }
+            });
+          }
+        });
       });
-    });
 
-    socket.on('disconnect', () => {
-      const index = connections.indexOf(socket);
-      connections.splice(index, 1);
+    socketServer.on('connection', socket => {
+      const userId = (userIdCount += 1);
+      connections[userId] = socket;
+
+      socket.emit('start', {userId});
+
+      socket.on('message', data => {
+        r.table('chat_messages')
+          .insert(data)
+          .run(dbConnection);
+      });
+
+      socket.on('disconnect', () => {
+        delete connections[userId];
+      });
     });
   });
 }
